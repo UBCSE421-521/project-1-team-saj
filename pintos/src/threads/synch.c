@@ -50,6 +50,29 @@ sema_init (struct semaphore *sema, unsigned value)
   list_init (&sema->waiters);
 }
 
+/*Suspends thread and adds it to the wait list*/
+void suspend_thread(struct list *t)
+{
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  list_push_back (t, &thread_current ()->elem);
+  thread_block ();
+  intr_set_level (old_level);
+}
+
+/*Wakeup thread from wait list*/
+void wakeup_thread(struct list *t)
+{
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  if (!list_empty (t)) 
+    thread_unblock (list_entry (list_pop_front (t),
+                                struct thread, elem));
+  intr_set_level (old_level);
+}
+
+
+
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
    to become positive and then atomically decrements it.
 

@@ -28,6 +28,9 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+/* List of all waiting processes */
+static struct list wait_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -92,12 +95,19 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&wait_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+}
+
+/* Returns the wait list*/
+struct list *get_wait_list()
+{
+  return &wait_list;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
