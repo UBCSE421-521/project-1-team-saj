@@ -247,8 +247,12 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem,&compare_priority,NULL);
   t->status = THREAD_READY;
+  if(thread_current()!=idle_thread && t->priority>thread_current()->priority)
+  {
+      thread_yield();
+  }
   intr_set_level (old_level);
 }
 
@@ -318,7 +322,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list,&cur->elem,&compare_priority,NULL);
+    //list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -345,7 +350,15 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  enum intr_level old_level=intr_disable();
+  int current_priority=thread_current ()->priority;
   thread_current ()->priority = new_priority;
+  if (!list_empty(&ready_list) && current_priority>new_priority)
+  {
+      thread_yield();
+  }
+  intr_set_level(old_level);
+  
 }
 
 /* Returns the current thread's priority. */
@@ -475,7 +488,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
-  list_push_back (&all_list, &t->allelem);
+  list_insert_ordered (&all_list, &t->allelem,compare_priority,NULL);
   intr_set_level (old_level);
 }
 
@@ -503,7 +516,10 @@ next_thread_to_run (void)
   if (list_empty (&ready_list))
     return idle_thread;
   else
+  {
+    list_sort(&ready_list,compare_priority,NULL);
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -573,6 +589,12 @@ schedule (void)
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
+}
+bool compare_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *ta= list_entry (a, struct thread, elem);
+  struct thread *tb= list_entry (b, struct thread, elem);
+  return ta->priority>tb->priority;
 }
 
 /* Returns a tid to use for a new thread. */
