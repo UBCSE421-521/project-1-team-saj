@@ -101,6 +101,7 @@ thread_init (void)
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
+
   initial_thread->tid = allocate_tid ();
 }
 
@@ -247,7 +248,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list, &t->elem,&compare_priority,NULL);
+  list_insert_ordered (&ready_list, &t->elem,compare_priority,NULL);
   t->status = THREAD_READY;
   if(thread_current()!=idle_thread && t->priority>thread_current()->priority)
   {
@@ -353,7 +354,7 @@ thread_set_priority (int new_priority)
   enum intr_level old_level=intr_disable();
   int current_priority=thread_current ()->priority;
   thread_current ()->priority = new_priority;
-  if (!list_empty(&ready_list) && current_priority>new_priority)
+  if ((!list_empty(&ready_list)) && current_priority>new_priority)
   {
       thread_yield();
   }
