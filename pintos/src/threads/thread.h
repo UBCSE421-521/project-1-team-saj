@@ -24,6 +24,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+#define F 16384                         /* Value representing 2^14. */
 
 /* A kernel thread or user process.
 
@@ -89,7 +90,9 @@ struct thread
     enum thread_status status;          /* Thread state. */
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                        /* Priority. */
+    int priority;                       /* Priority. */
+    int nice;                           /* Nice Value.*/
+    int recent_cpu;                     /* Recent CPU Value.*/
     int64_t start;
     int64_t wait;   
     int base_priority;
@@ -149,5 +152,20 @@ int thread_get_load_avg (void);
 
 bool compare_priority(const struct list_elem *, const struct list_elem *, void *);
 void Donate_Prioirty(struct thread *);
+
+void Update_Priority(struct thread *t, void *aux UNUSED);
+void Update_Recent_Cpu(struct thread *t, void *aux UNUSED);
+
+int conv_int_to_fix(int n);
+int conv_fix_to_int_zero(int x);
+int conv_fix_to_int_nearest(int x);
+int get_sum_fp(int x, int y);
+int get_sum_fp_int(int x, int n);
+int get_diff_fp(int x, int y);
+int get_diff_fp_int(int x, int n);
+int get_product_fp(int x, int y);
+int get_product_fp_int(int x, int n);
+int get_div_fp(int x, int y);
+int get_div_fp_int(int x, int n);
 
 #endif /* threads/thread.h */
