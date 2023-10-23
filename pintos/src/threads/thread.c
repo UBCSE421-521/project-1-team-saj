@@ -40,7 +40,7 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
-int load_avg;
+static int load_avg;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame
@@ -63,6 +63,7 @@ static unsigned thread_ticks; /* # of timer ticks since last yield. */
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
+bool reschedule_falg = false;
 
 static void kernel_thread(thread_func *, void *aux);
 
@@ -265,7 +266,7 @@ void thread_unblock(struct thread *t)
   list_insert_ordered(&ready_list, &t->elem, (list_less_func *)&compare_priority, NULL);
 
   t->status = THREAD_READY;
-  if (!intr_context() && thread_current() != idle_thread && t->priority > thread_current()->priority)
+  if (!thread_mlfqs && thread_current() != idle_thread && t->priority > thread_current()->priority)
   {
     thread_yield();
   }
@@ -368,7 +369,7 @@ void thread_set_priority(int new_priority)
   int old_priority = current_thread->priority;
   current_thread->base_priority = new_priority;
 
-  if (!intr_context() && list_empty(&current_thread->acquired_locks) || new_priority > old_priority)
+  if (list_empty(&current_thread->acquired_locks) || new_priority > old_priority)
   {
     current_thread->priority = new_priority;
     thread_yield();
@@ -541,11 +542,17 @@ init_thread(struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   if (thread_mlfqs)
   {
-    t->recent_cpu = t == initial_thread ? 0 : thread_current()->recent_cpu;
-    t->nice = t == initial_thread ? 0 : thread_current()->nice;
+    if(t==initial_thread){
+      t->recent_cpu = 0;
+      t->nice = 0;
+    }else{
+      t->recent_cpu = thread_current()->recent_cpu;
+      t->nice = thread_current()->nice;
+    }
+
     t->priority = PRI_MAX - conv_fix_to_int_nearest((t->recent_cpu / 4)) - (t->nice * 2);
   }
-
+  
   t->base_priority = priority;
   list_init(&t->acquired_locks);
   t->lock_to_acquire = NULL;
