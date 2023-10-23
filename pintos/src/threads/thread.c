@@ -266,7 +266,7 @@ void thread_unblock(struct thread *t)
   list_insert_ordered(&ready_list, &t->elem, (list_less_func *)&compare_priority, NULL);
 
   t->status = THREAD_READY;
-  if (!thread_mlfqs && thread_current() != idle_thread && t->priority > thread_current()->priority)
+  if (!intr_context() && thread_current() != idle_thread && t->priority > thread_current()->priority)
   {
     thread_yield();
   }
