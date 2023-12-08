@@ -87,50 +87,13 @@ timer_elapsed (int64_t then)
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
-timer_sleep (int64_t ticks1) 
+timer_sleep (int64_t ticks) 
 {
   int64_t start = timer_ticks ();
-  if (timer_elapsed(start) >= ticks1) return;
-  thread_current ()->start = start;
-  thread_current ()->wait = ticks1;
-  suspend_thread(get_wait_list());
+
   ASSERT (intr_get_level () == INTR_ON);
-}
-
-/*Used to sort wait list*/
-bool my_sort(const struct list_elem *a, const struct list_elem *b, void *aux)
-{
-  struct thread *a2 = list_entry (a, struct thread, elem);
-  struct thread *b2 = list_entry (b, struct thread, elem);
-  int64_t a2_diff = 0;
-  int64_t b2_diff = 0;
-
-  if (timer_elapsed(a2->start) >= a2->wait) a2_diff = timer_elapsed(a2->start) - a2->wait  + (63 - a2->priority);
-  else a2_diff = a2->wait - timer_elapsed(a2->start) + (63 - a2->priority);
-
-  if (timer_elapsed(b2->start) >= b2->wait) b2_diff = timer_elapsed(b2->start) - b2->wait + (63 - b2->priority);
-  else b2_diff = b2->wait - timer_elapsed(b2->start) + (63 - b2->priority);
-
-  if (a2_diff < b2_diff) return true;
-  else if (a2_diff == b2_diff && a2->priority > b2->priority) return true;
-  else return false;
-}
-
-/*Checks if any waiting threads need to wakeup*/
-void
-timer_check_alarm()
-{
-  if (!(list_empty (get_wait_list())))
-  {
-    list_sort(get_wait_list(), my_sort, NULL);
-    struct thread *t = list_entry (list_front (get_wait_list()), struct thread, elem);
-    while (timer_elapsed(t->start) >= t->wait && !(t->wait <= 0))
-    {
-       wakeup_thread(get_wait_list());
-       if (t->elem.next == NULL) break;
-       t = list_entry (list_begin (get_wait_list()), struct thread, elem);
-    }
-  }
+  while (timer_elapsed (start) < ticks) 
+    thread_yield ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -209,7 +172,6 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  timer_check_alarm ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
