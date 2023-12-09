@@ -92,6 +92,15 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+   
+   //File size for file descriptor
+   int file_descriptor_size;
+
+   //  Added for file descriptor
+   struct list file_descriptor_list;
+
+   struct file *executing_file;	
+    
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

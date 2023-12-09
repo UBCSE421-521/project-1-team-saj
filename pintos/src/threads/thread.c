@@ -462,6 +462,12 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+
+  t->executing_file = NULL;
+  t->file_descriptor_size = 1;
+  list_init(&t->file_descriptor_list);
+
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
