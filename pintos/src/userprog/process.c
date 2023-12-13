@@ -77,7 +77,6 @@ start_process (void *file_name_)
   /* If load failed, quit. */
   palloc_free_page (file_name);
   thread_current()->isloaded = success;
-  sema_up(&(thread_current()->wait));
   if (!success) 
     thread_exit ();
 
@@ -103,13 +102,19 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  // while(true)
+  // {
+  //   printf("");
+  //   //Just for testing
+  // }
   //return -1;
   struct thread *t;
   t= find_child(&thread_current()->children, child_tid);
-  if (!t)
+  if (t == NULL)
   {
     return -1;
   }
+
   sema_down(&(t->wait));
   return t->exit_status;
 }

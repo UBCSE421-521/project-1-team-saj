@@ -49,7 +49,14 @@ syscall_handler(struct intr_frame *f UNUSED)
   }
   case SYS_EXIT:
   {
+    bool validAddress = is_valid_address(arg);
+    if (validAddress)
+    {
     exit(getValueAtAddress(arg));
+    }
+    else{
+      exit(-1);
+    }
     break;
   }
   case SYS_EXEC:
@@ -200,10 +207,21 @@ void halt()
 
 void exit(int status)
 {
+    struct thread *cur = thread_current();
+    printf ("%s: exit(%d)\n", cur -> name, status);
+    cur->exit_status = status;
+    thread_exit();
+
 }
 
 tid_t exec(const char *command_line)
 {
+    struct thread* parent = thread_current();
+    tid_t pid = -1;
+    lock_acquire(&file_system_lock);
+    pid = process_execute(command_line);
+    lock_release(&file_system_lock);
+    return pid;
 }
 
 int wait(tid_t pid)
@@ -396,7 +414,6 @@ int getValueAtAddress(const void *address)
   return *((int *)address);
 }
 
-// Checking if the given address is in valid user space and if the address is mapped
 bool is_valid_address(const void *address)
 {
   bool isPointer = true;
