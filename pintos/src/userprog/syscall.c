@@ -49,7 +49,14 @@ syscall_handler(struct intr_frame *f UNUSED)
   }
   case SYS_EXIT:
   {
+    bool validAddress = is_valid_address(arg);
+    if (validAddress)
+    {
     exit(getValueAtAddress(arg));
+    }
+    else{
+      exit(-1);
+    }
     break;
   }
   case SYS_EXEC:
@@ -57,7 +64,8 @@ syscall_handler(struct intr_frame *f UNUSED)
     bool validAddress = is_valid_address(arg);
     if (validAddress)
     {
-      f->eax = exec((const char *)arg);
+      int *file_name = (int *) f->esp + 1;
+      f->eax = exec((const char *)file_name[0]);
     }
     else
     {
@@ -74,12 +82,11 @@ syscall_handler(struct intr_frame *f UNUSED)
   case SYS_CREATE:
   {
     bool validAddress = is_valid_address(arg);
-    int arg1 = getValueAtAddress(arg);
-    arg += 4;
-    int arg2 = getValueAtAddress(arg);
+    int *file_name = (int *) f->esp + 1;
+    int *size = (int *) f->esp + 2;
     if (validAddress)
     {
-      f->eax = create((const char *)arg1, (unsigned)arg2);
+      f->eax = create((const char *)file_name[0], (unsigned)size[0]);
     }
     else
     {
@@ -92,7 +99,8 @@ syscall_handler(struct intr_frame *f UNUSED)
     int validAddress = is_valid_address(arg);
     if (validAddress)
     {
-      f->eax = remove((const char *)arg);
+      int *file_name = (int *) f->esp + 1;
+      f->eax = remove((const char *)file_name[0]);
     }
     else
     {
@@ -106,7 +114,8 @@ syscall_handler(struct intr_frame *f UNUSED)
     int validAddress = is_valid_address(arg);
     if (validAddress)
     {
-      f->eax = open((const char *)arg);
+      int *open_file_name = (int *) f->esp + 1;
+      f->eax = open((const char *)open_file_name[0]);
     }
     else
     {
@@ -128,7 +137,7 @@ syscall_handler(struct intr_frame *f UNUSED)
     int arg2 = getValueAtAddress(arg);
     arg += 4;
     int arg3 = getValueAtAddress(arg);
-
+   //int read (int fd, void *buffer, unsigned size)
     bool valid1 = is_valid_address((const void *)arg2);
     void *endAddress = ((void *)arg2) + arg3;
     bool valid2 = is_valid_address((const void *)endAddress);
@@ -198,10 +207,21 @@ void halt()
 
 void exit(int status)
 {
+    struct thread *cur = thread_current();
+    printf ("%s: exit(%d)\n", cur -> name, status);
+    cur->exit_status = status;
+    thread_exit();
+
 }
 
 tid_t exec(const char *command_line)
 {
+    struct thread* parent = thread_current();
+    tid_t pid = -1;
+    lock_acquire(&file_system_lock);
+    pid = process_execute(command_line);
+    lock_release(&file_system_lock);
+    return pid;
 }
 
 int wait(tid_t pid)
@@ -233,7 +253,6 @@ int open(const char *file)
   {
     return -1;
   }
-
   lock_acquire(&file_system_lock);
   struct file *openedFile = filesys_open(file);
   lock_release(&file_system_lock);
@@ -246,7 +265,6 @@ int open(const char *file)
   struct thread *currentThread = thread_current();
   currentThread->file_descriptor_size = currentThread->file_descriptor_size + 1;
   int newFd = currentThread->file_descriptor_size;
-
   struct fd_entry *fdentry = (struct fd_entry *)malloc(sizeof(struct fd_entry));
   if (fdentry == NULL)
   {
