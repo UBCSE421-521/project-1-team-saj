@@ -98,8 +98,14 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
-}
 
+  initial_thread->parent=NULL;
+
+}
+struct list *get_all_list()
+{
+  return &all_list;
+}
 /* Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
 void
@@ -182,6 +188,8 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  list_push_back (&thread_current ()->children, &t->childelem);
+  t->parent = thread_current (); 
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -466,8 +474,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->executing_file = NULL;
   t->file_descriptor_size = 1;
   list_init(&t->file_descriptor_list);
-
-
+  t->parent = NULL;
+  list_init(&t->children);
+  t->exit_status = 1;
+  sema_init (&t->wait, 0);
+  t->isloaded = false;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
