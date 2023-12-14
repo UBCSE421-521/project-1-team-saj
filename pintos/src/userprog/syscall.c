@@ -82,11 +82,14 @@ syscall_handler(struct intr_frame *f UNUSED)
 
   case SYS_CREATE:
   {
+    //printf("CREATE\n");
     bool validAddress = is_valid_address(arg);
     int *file_name = (int *)f->esp + 1;
     int *size = (int *)f->esp + 2;
-    if (validAddress)
+    bool valid = is_valid_address((const void *)file_name[0]);
+    if (validAddress && valid)
     {
+      //printf("Passed mem check\n");
       f->eax = create((const char *)file_name[0], (unsigned)size[0]);
     }
     else
@@ -113,9 +116,10 @@ syscall_handler(struct intr_frame *f UNUSED)
   case SYS_OPEN:
   {
     int validAddress = is_valid_address(arg);
-    if (validAddress)
+    int *open_file_name = (int *)f->esp + 1;
+    bool valid = is_valid_address((const void *)open_file_name[0]);
+    if (validAddress && valid)
     {
-      int *open_file_name = (int *)f->esp + 1;
       f->eax = open((const char *)open_file_name[0]);
     }
     else
