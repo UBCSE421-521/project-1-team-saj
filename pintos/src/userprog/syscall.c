@@ -399,6 +399,8 @@ void close(int fd)
   {
     lock_acquire(&file_system_lock);
     file_close(entryFile);
+    list_remove(&fd_ent->elem);
+    free(fd_ent);
     lock_release(&file_system_lock);
   }
   else
