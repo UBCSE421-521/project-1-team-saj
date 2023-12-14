@@ -21,6 +21,8 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+static void stack_arguments(char *file_name, void **esp);
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -29,20 +31,31 @@ tid_t
 process_execute (const char *file_name) 
 {
   char *fn_copy;
+  char *save_ptr;
+  char *name;
   tid_t tid;
 
+
+
+  name = malloc(strlen(file_name)+1);
+  strlcpy (name, file_name, strlen(file_name)+1);
+  name = strtok_r (name," ",&save_ptr);
+
   /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
+      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
-    return TID_ERROR;
+      return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (name, PRI_DEFAULT, start_process, fn_copy);
+  free(name);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+ 
   return tid;
+  
 }
 
 /* A thread function that loads a user process and starts it
@@ -63,6 +76,7 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
+  thread_current()->isloaded = success;
   if (!success) 
     thread_exit ();
 
@@ -88,8 +102,37 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  return -1;
+  // while(true)
+  // {
+  //   printf("");
+  //   //Just for testing
+  // }
+  //return -1;
+  struct thread *t;
+  t= find_child(&thread_current()->children, child_tid);
+  if (t == NULL)
+  {
+    return -1;
+  }
+
+  sema_down(&(t->wait));
+  return t->exit_status;
 }
+
+struct thread* find_child(struct list *children, int pid)
+{
+    struct list_elem* e;
+    for (e = list_begin (get_all_list()); e != list_end (children); e = list_next (e))
+    {
+        struct thread *cp = list_entry (e, struct thread, allelem);
+        if(cp -> tid == pid)
+        {
+            return cp;
+        }
+    }
+    return NULL;
+}
+
 
 /* Free the current process's resources. */
 void
@@ -98,6 +141,19 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  cur->exit_status = -1;
+  sema_up(&cur->wait);
+  cur = thread_current ();
+
+  for (struct list_elem *l = list_begin (&cur->children); l != list_end (&cur->children); l = list_next (l))
+    {
+      struct thread *t = list_entry (l, struct thread, childelem);
+      t->parent = NULL;
+      list_remove (&t->childelem);
+        
+    }
+  cur->parent = NULL;
+  file_close(cur->executing_file);
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -214,6 +270,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  char *fn_copy;
+  char *save_ptr;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -221,8 +279,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  int name_length = strlen (file_name)+1;
+  fn_copy = malloc (name_length);
+  strlcpy(fn_copy, file_name, name_length);
+  fn_copy = strtok_r (fn_copy, " ", &save_ptr);
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (fn_copy);
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -300,11 +363,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
           break;
         }
     }
-
+  free(fn_copy);
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
-
+  stack_arguments(file_name, esp);
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
 
@@ -316,6 +379,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
   return success;
 }
 
+
+
 /* load() helpers. */
 
 static bool install_page (void *upage, void *kpage, bool writable);
@@ -462,4 +527,57 @@ install_page (void *upage, void *kpage, bool writable)
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
+static void stack_arguments(char *file_name, void **esp)
+{
+  char * fcopy = malloc(strlen(file_name)+1);
+  char *save_ptr;
+  int *arg_add;
+  strlcpy (fcopy, file_name, strlen(file_name)+1);
+  int arg_c = 0;
+  int i=0;
+  int sum=0;
+  for (char *token = strtok_r (file_name, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr))
+  {
+    arg_c++;
+  }
+  arg_add = calloc(arg_c,sizeof(int));
+  for (char *token = strtok_r (fcopy, " ", &save_ptr); token != NULL;token = strtok_r (NULL, " ", &save_ptr))
+  {
+      *esp -= strlen(token) + 1;
+      memcpy(*esp, token, strlen(token) + 1);
+      arg_add[i]=*esp;
+      i++;
+      sum += strlen(token) + 1;
+  }
+  free(fcopy);
+  //padding
+  while(sum%4!=0)
+  {
+    *esp -= 1;
+    memset(*esp, 0, 1);
+    sum++;
+  }
+
+  *esp-=sizeof(int);
+  memset(*esp, 0 ,sizeof(int));
+  //Copying Arguments Address
+  for(int j=arg_c-1; j>=0; j--)
+  {
+    *esp-=sizeof(int);
+    memcpy(*esp,&arg_add[j],sizeof(int));
+  }
+   
+  free(arg_add);
+  //argv
+  int temp=*esp;
+  *esp -= sizeof(int);
+  memcpy(*esp,&temp,sizeof(int));
+ 
+  *esp-=sizeof(int);
+  memcpy(*esp,&arg_c,sizeof(int));
+
+  *esp-=sizeof(int);
+  memset(*esp,0 ,sizeof(int));
 }
