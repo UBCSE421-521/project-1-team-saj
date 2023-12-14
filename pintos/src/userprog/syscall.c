@@ -52,9 +52,10 @@ syscall_handler(struct intr_frame *f UNUSED)
     bool validAddress = is_valid_address(arg);
     if (validAddress)
     {
-    exit(getValueAtAddress(arg));
+      exit(getValueAtAddress(arg));
     }
-    else{
+    else
+    {
       exit(-1);
     }
     break;
@@ -64,7 +65,7 @@ syscall_handler(struct intr_frame *f UNUSED)
     bool validAddress = is_valid_address(arg);
     if (validAddress)
     {
-      int *file_name = (int *) f->esp + 1;
+      int *file_name = (int *)f->esp + 1;
       f->eax = exec((const char *)file_name[0]);
     }
     else
@@ -82,8 +83,8 @@ syscall_handler(struct intr_frame *f UNUSED)
   case SYS_CREATE:
   {
     bool validAddress = is_valid_address(arg);
-    int *file_name = (int *) f->esp + 1;
-    int *size = (int *) f->esp + 2;
+    int *file_name = (int *)f->esp + 1;
+    int *size = (int *)f->esp + 2;
     if (validAddress)
     {
       f->eax = create((const char *)file_name[0], (unsigned)size[0]);
@@ -99,7 +100,7 @@ syscall_handler(struct intr_frame *f UNUSED)
     int validAddress = is_valid_address(arg);
     if (validAddress)
     {
-      int *file_name = (int *) f->esp + 1;
+      int *file_name = (int *)f->esp + 1;
       f->eax = remove((const char *)file_name[0]);
     }
     else
@@ -114,7 +115,7 @@ syscall_handler(struct intr_frame *f UNUSED)
     int validAddress = is_valid_address(arg);
     if (validAddress)
     {
-      int *open_file_name = (int *) f->esp + 1;
+      int *open_file_name = (int *)f->esp + 1;
       f->eax = open((const char *)open_file_name[0]);
     }
     else
@@ -137,13 +138,16 @@ syscall_handler(struct intr_frame *f UNUSED)
     int arg2 = getValueAtAddress(arg);
     arg += 4;
     int arg3 = getValueAtAddress(arg);
-   //int read (int fd, void *buffer, unsigned size)
-    bool valid1 = is_valid_address((const void *)arg2);
-    void *endAddress = ((void *)arg2) + arg3;
-    bool valid2 = is_valid_address((const void *)endAddress);
-    if (valid1 && valid2)
+    // int read (int fd, void *buffer, unsigned size)
+    bool valid = is_valid_address_range((const void *)arg2, arg3);
+
+    if (valid)
     {
       f->eax = read(arg1, (void *)arg2, (unsigned)arg3);
+    }
+    else
+    {
+      exit(-1);
     }
     break;
   }
@@ -161,6 +165,10 @@ syscall_handler(struct intr_frame *f UNUSED)
     if (valid1 && valid2)
     {
       f->eax = write(arg1, (void *)arg2, (unsigned)arg3);
+    }
+    else
+    {
+      exit(-1);
     }
     break;
   }
@@ -207,21 +215,20 @@ void halt()
 
 void exit(int status)
 {
-    struct thread *cur = thread_current();
-    printf ("%s: exit(%d)\n", cur -> name, status);
-    cur->exit_status = status;
-    thread_exit();
-
+  struct thread *cur = thread_current();
+  printf("%s: exit(%d)\n", cur->name, status);
+  cur->exit_status = status;
+  thread_exit();
 }
 
 tid_t exec(const char *command_line)
 {
-    struct thread* parent = thread_current();
-    tid_t pid = -1;
-    lock_acquire(&file_system_lock);
-    pid = process_execute(command_line);
-    lock_release(&file_system_lock);
-    return pid;
+  struct thread *parent = thread_current();
+  tid_t pid = -1;
+  lock_acquire(&file_system_lock);
+  pid = process_execute(command_line);
+  lock_release(&file_system_lock);
+  return pid;
 }
 
 int wait(tid_t pid)
@@ -420,6 +427,7 @@ bool is_valid_address(const void *address)
 {
   bool isPointer = true;
   uint32_t *page_directory = thread_current()->pagedir;
+  void *pointer = pagedir_get_page(page_directory, address);
 
   for (int i = 0; i < 5; i++)
   {
@@ -427,15 +435,26 @@ bool is_valid_address(const void *address)
     {
       return false;
     }
-  }
-
-  void *pointer = pagedir_get_page(page_directory, address);
-  if (pointer == NULL)
-  {
-    return false;
+    if (pointer == NULL)
+    {
+      return false;
+    }
   }
 
   return isPointer;
+}
+
+bool is_valid_address_range(const void *start, unsigned size)
+{
+  for (int i = 0; i < size; i++)
+  {
+    const void *address = (const char *)start + i;
+    if (!is_user_vaddr(address) || pagedir_get_page(thread_current()->pagedir, address) == NULL)
+    {
+      return false;
+    }
+  }
+  return true;
 }
 
 struct fd_entry *get_file_descriptor(int fd)

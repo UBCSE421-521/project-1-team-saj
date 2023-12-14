@@ -30,6 +30,7 @@ void close (int fd);
 
 struct fd_entry *get_file_descriptor(int fd);
 bool is_valid_address(const void *address);
+bool is_valid_address_range(const void *start, unsigned size);
 int getValueAtAddress(const void *address);
 
 #endif /* userprog/syscall.h */
