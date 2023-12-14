@@ -238,6 +238,10 @@ int wait(tid_t pid)
 
 bool create(const char *file, unsigned size)
 {
+  if (file == NULL)
+  {
+    exit(-1);
+  }
   bool return_val;
   lock_acquire(&file_system_lock);
   return_val = filesys_create(file, size);
