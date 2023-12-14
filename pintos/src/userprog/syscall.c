@@ -63,9 +63,10 @@ syscall_handler(struct intr_frame *f UNUSED)
   case SYS_EXEC:
   {
     bool validAddress = is_valid_address(arg);
-    if (validAddress)
+    int *file_name = (int *)f->esp + 1;
+    bool valid = is_valid_address((const void *)file_name[0]);
+    if (validAddress && valid)
     {
-      int *file_name = (int *)f->esp + 1;
       f->eax = exec((const char *)file_name[0]);
     }
     else
