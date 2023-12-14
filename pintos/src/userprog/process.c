@@ -122,7 +122,7 @@ process_wait (tid_t child_tid UNUSED)
 struct thread* find_child(struct list *children, int pid)
 {
     struct list_elem* e;
-    for (e = list_begin (get_all_list()); e != list_end (children); e = list_next (e))
+    for (e = list_begin (get_all_list()); e != list_end (get_all_list()); e = list_next (e))
     {
         struct thread *cp = list_entry (e, struct thread, allelem);
         if(cp -> tid == pid)
